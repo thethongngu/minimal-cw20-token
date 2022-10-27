@@ -1,100 +1,97 @@
-# CosmWasm Starter Pack
+# Minimal implementation for CW20 Token (CosmWasm)
 
-This is a template to build smart contracts in Rust to run inside a
-[Cosmos SDK](https://github.com/cosmos/cosmos-sdk) module on all chains that enable it.
-To understand the framework better, please read the overview in the
-[cosmwasm repo](https://github.com/CosmWasm/cosmwasm/blob/master/README.md),
-and dig into the [cosmwasm docs](https://www.cosmwasm.com).
-This assumes you understand the theory and just want to get coding.
+Minimal smart contract implementation on CosmWasm to CW20 token.
+Supported functionalities:
+* Transfer tokens
+* Mint tokens from only fixed address (admin)
+* Burn tokens from any address
 
-## Creating a new repo from template
+## Guide
+This guideline is based on [official CosmWasm doc](https://docs.cosmwasm.com/docs/1.0/).
 
-Assuming you have a recent version of rust and cargo (v1.58.1+) installed
-(via [rustup](https://rustup.rs/)),
-then the following should get you a new repo to start a contract:
+### Prepare
+1. Requirement: [Step-by-step](https://docs.cosmwasm.com/docs/1.0/getting-started/installation)
+    * `wasmd`
+    * `Rust` with wasm32 build target 
+    * `jq` (tool to parse json response when execute smart contract)
+2. Create your wallet (should create more than 1 wallet for testing transfer)
+    ```bash
+    wasmd keys add {your-wallet-name}
+    ```
+3. Export those variables to use later
+    ```bash
+    # We gonna use malaga testnet
+    export CHAIN_ID="malaga-420"  
+    export TESTNET_NAME="malaga-420"
+    export RPC="https://rpc.malaga-420.cosmwasm.com:443"
+    export API="https://api.malaga-420.cosmwasm.com"
+    export FAUCET="https://faucet.malaga-420.cosmwasm.com"
 
-Install [cargo-generate](https://github.com/ashleygwilliams/cargo-generate) and cargo-run-script.
-Unless you did that before, run this line now:
+    export FEE_DENOM="umlg"
+    export STAKE_DENOM="uand"
+    export BECH32_HRP="wasm"
+    export WASMD_VERSION="v0.27.0"
+    export CONFIG_DIR=".wasmd"
+    export BINARY="wasmd"
 
-```sh
-cargo install cargo-generate --features vendored-openssl
-cargo install cargo-run-script
-```
+    export NODE=(--node $RPC)
+    export TXFLAG=($NODE --chain-id $CHAIN_ID --gas-prices 0.25$FEE_DENOM --gas auto --gas-adjustment 1.3)
+    ```
+4. Add fund to your wallet (to deploy and run smart contract, called `gas` in Ethereuum)
+    ```bash
+    JSON=$(jq -n --arg addr $(wasmd keys show -a {your-wallet-name}) '{"denom":"umlg","address":$addr}') && curl -X POST --header "Content-Type: application/json" --data "$JSON" https://faucet.malaga-420.cosmwasm.com/credit
 
-Now, use it to create your new contract.
-Go to the folder in which you want to place it and run:
+    # Quick check your balance
+    wasmd query bank balances $(wasmd keys show -a {your-wallet-name}) $NODE
+    ```
 
+### Compile & Deploy & Interact
+1. Update minter address in `src/state.rs` to yours
+2. Compile to `.wasm` file (You can also use docker for more optimized [here](https://docs.cosmwasm.com/docs/1.0/getting-started/compile-contract#optimized-compilation))
+    ```bash
+    RUSTFLAGS='-C link-arg=-s' cargo wasm
+    ```
+3. Deploy
+    ```bash
+    # Upload your smart contract
+    RES=$(wasmd tx wasm store {your-path-to-wasm-file} --from wallet $TXFLAG -y --output json -b block)
 
-**Latest**
+    # Get code_id of your smart contract
+    CODE_ID=$(echo $RES | jq -r '.logs[0].events[-1].attributes[0].value')
+    ```
+4. Initialize
+    ```bash
+    # InstantiateMsg (change this on your preference)
+    INIT_MSG='{"name": "THONG COIN","symbol": "CUCMO","cap": "1000000","total_supply": "500000"}'
 
-```sh
-cargo generate --git https://github.com/CosmWasm/cw-template.git --name PROJECT_NAME
-````
+    # Initialize contract with InstantiateMsg
+    wasmd tx wasm instantiate $CODE_ID "$INIT_MSG" --from {your-wallet-name} --label {your-contract-label} $TXFLAG -y --no-admin
 
-For cloning minimal code repo:
+    # Check list of contract that initialized before
+    wasmd query wasm list-contract-by-code $CODE_ID $NODE --output json
 
-```sh
-cargo generate --git https://github.com/CosmWasm/cw-template.git --name PROJECT_NAME -d minimal=true
-```
+    # Extract the contract address to use later
+    CONTRACT=$(wasmd query wasm list-contract-by-code $CODE_ID $NODE --output json | jq -r '.contracts[-1]')
 
-**Older Version**
+    ```
+5. Interact
+    ```bash
+    # Wallet name that have tokens
+    WALLET_FROM={your-wallet-name}
 
-Pass version as branch flag:
+    # Wallet name that you want to transfer to
+    WALLET_TO={another-wallet-name}
 
-```sh
-cargo generate --git https://github.com/CosmWasm/cw-template.git --branch <version> --name PROJECT_NAME
-````
+    # TransferMsg (change this on your preference)
+    TRANSFER='{"transfer":{"recipient":"'$(wasmd keys show -a $WALLET_TO)'","amount":"55"}}'
+    echo $TRANSFER
 
-Example:
+    # Execute TRANSFER command on smart contract
+    wasmd tx wasm execute $CONTRACT "$TRANSFER" --from $WALLET_FROM $TXFLAG -y
 
-```sh
-cargo generate --git https://github.com/CosmWasm/cw-template.git --branch 0.16 --name PROJECT_NAME
-```
+    # QueryBalanceMsg (change this on your preference)
+    BALANCE='{"balance": {"address": "'$(wasmd keys show -a $WALLET_FROM)'"}}'
 
-You will now have a new folder called `PROJECT_NAME` (I hope you changed that to something else)
-containing a simple working contract and build system that you can customize.
-
-## Create a Repo
-
-After generating, you have a initialized local git repo, but no commits, and no remote.
-Go to a server (eg. github) and create a new upstream repo (called `YOUR-GIT-URL` below).
-Then run the following:
-
-```sh
-# this is needed to create a valid Cargo.lock file (see below)
-cargo check
-git branch -M main
-git add .
-git commit -m 'Initial Commit'
-git remote add origin YOUR-GIT-URL
-git push -u origin main
-```
-
-## CI Support
-
-We have template configurations for both [GitHub Actions](.github/workflows/Basic.yml)
-and [Circle CI](.circleci/config.yml) in the generated project, so you can
-get up and running with CI right away.
-
-One note is that the CI runs all `cargo` commands
-with `--locked` to ensure it uses the exact same versions as you have locally. This also means
-you must have an up-to-date `Cargo.lock` file, which is not auto-generated.
-The first time you set up the project (or after adding any dep), you should ensure the
-`Cargo.lock` file is updated, so the CI will test properly. This can be done simply by
-running `cargo check` or `cargo unit-test`.
-
-## Using your project
-
-Once you have your custom repo, you should check out [Developing](./Developing.md) to explain
-more on how to run tests and develop code. Or go through the
-[online tutorial](https://docs.cosmwasm.com/) to get a better feel
-of how to develop.
-
-[Publishing](./Publishing.md) contains useful information on how to publish your contract
-to the world, once you are ready to deploy it on a running blockchain. And
-[Importing](./Importing.md) contains information about pulling in other contracts or crates
-that have been published.
-
-Please replace this README file with information about your specific project. You can keep
-the `Developing.md` and `Publishing.md` files as useful referenced, but please set some
-proper description in the README.
+    # Execute QUERY balance command on smart contract
+    wasmd query wasm contract-state smart $CONTRACT "$BALANCE" $NODE --output json
+    ```

@@ -8,6 +8,13 @@ pub enum ContractError {
 
     #[error("Unauthorized")]
     Unauthorized {},
-    // Add any other custom errors you like here.
-    // Look at https://docs.rs/thiserror/1.0.21/thiserror/ for details.
+
+    #[error("Invalid zero amount")]
+    InvalidZeroAmount {},
+
+    #[error("Minting cannot exceed the cap")]
+    CannotExceedCap {},
+
+    #[error("Total supply cannot exceed the cap")]
+    SupplyExceedCap {},
 }

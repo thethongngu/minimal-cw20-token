@@ -1,26 +1,32 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
+use cosmwasm_std::{StdResult, Uint128};
 
 #[cw_serde]
+#[cfg_attr(test, derive(Default))]
 pub struct InstantiateMsg {
-    pub count: i32,
+    pub name: String,
+    pub symbol: String,
+    pub cap: Uint128,
+    pub total_supply: Uint128,
+}
+
+impl InstantiateMsg {
+    pub fn validate(&self) -> StdResult<()> {
+        // TODO: implement
+        Ok(())
+    }
 }
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    Increment {},
-    Reset { count: i32 },
+    Transfer { recipient: String, amount: Uint128 },
+    Burn { amount: Uint128 },
+    Mint { recipient: String, amount: Uint128 },
 }
 
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    // GetCount returns the current count as a json-encoded number
-    #[returns(GetCountResponse)]
-    GetCount {},
-}
-
-// We define a custom struct for each query response
-#[cw_serde]
-pub struct GetCountResponse {
-    pub count: i32,
+    #[returns(Uint128)]
+    Balance { address: String },
 }

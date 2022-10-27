@@ -1,7 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use crate::helpers::CwTemplateContract;
     use crate::msg::InstantiateMsg;
+    use crate::state::MINTER_ADDR;
+    use crate::{helpers::CwTemplateContract, msg::ExecuteMsg};
     use cosmwasm_std::{Addr, Coin, Empty, Uint128};
     use cw_multi_test::{App, AppBuilder, Contract, ContractWrapper, Executor};
 
@@ -14,19 +15,15 @@ mod tests {
         Box::new(contract)
     }
 
-    const USER: &str = "USER";
-    const ADMIN: &str = "ADMIN";
-    const NATIVE_DENOM: &str = "denom";
-
     fn mock_app() -> App {
         AppBuilder::new().build(|router, _, storage| {
             router
                 .bank
                 .init_balance(
                     storage,
-                    &Addr::unchecked(USER),
+                    &Addr::unchecked(MINTER_ADDR),
                     vec![Coin {
-                        denom: NATIVE_DENOM.to_string(),
+                        denom: "denom".to_string(),
                         amount: Uint128::new(1),
                     }],
                 )
@@ -38,11 +35,16 @@ mod tests {
         let mut app = mock_app();
         let cw_template_id = app.store_code(contract_template());
 
-        let msg = InstantiateMsg { count: 1i32 };
+        let msg = InstantiateMsg {
+            name: String::from("THONG COIN"),
+            symbol: String::from("CUCMO"),
+            cap: Uint128::from(300u128),
+            total_supply: Uint128::from(200u128),
+        };
         let cw_template_contract_addr = app
             .instantiate_contract(
                 cw_template_id,
-                Addr::unchecked(ADMIN),
+                Addr::unchecked(MINTER_ADDR),
                 &msg,
                 &[],
                 "test",
@@ -55,17 +57,16 @@ mod tests {
         (app, cw_template_contract)
     }
 
-    mod count {
-        use super::*;
-        use crate::msg::ExecuteMsg;
+    #[test]
+    fn mint() {
+        let (mut app, cw_template_contract) = proper_instantiate();
 
-        #[test]
-        fn count() {
-            let (mut app, cw_template_contract) = proper_instantiate();
-
-            let msg = ExecuteMsg::Increment {};
-            let cosmos_msg = cw_template_contract.call(msg).unwrap();
-            app.execute(Addr::unchecked(USER), cosmos_msg).unwrap();
-        }
+        let msg = ExecuteMsg::Mint {
+            recipient: (&MINTER_ADDR).to_string(),
+            amount: Uint128::from(100u128),
+        };
+        let cosmos_msg = cw_template_contract.call(msg).unwrap();
+        app.execute(Addr::unchecked(MINTER_ADDR), cosmos_msg)
+            .unwrap();
     }
 }

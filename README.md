@@ -1,6 +1,6 @@
 # Minimal implementation for CW20 Token (CosmWasm)
 
-Minimal smart contract implementation on CosmWasm to CW20 token.
+Minimal implementation of CW20 token on CosmWasm.
 Supported functionalities:
 * Transfer tokens
 * Mint tokens from only fixed address (admin)

@@ -3,8 +3,8 @@
 Minimal implementation of CW20 token on CosmWasm.
 Supported functionalities:
 * Transfer tokens
-* Mint tokens from only fixed address (admin)
-* Burn tokens from any address
+* Mint tokens (from only fixed address)
+* Burn tokens
 
 ## Guide
 This guideline is based on [official CosmWasm doc](https://docs.cosmwasm.com/docs/1.0/).
